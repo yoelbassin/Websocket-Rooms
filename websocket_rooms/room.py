@@ -3,7 +3,7 @@ from enum import Enum
 from gc import callbacks
 import inspect
 import json
-from typing import Any, Callable, Dict, List, Union, NoReturn
+from typing import Any, Callable, Dict, List, Union, NoReturn, get_args
 from starlette.websockets import WebSocketState, Message, WebSocket, WebSocketDisconnect
 
 class ReceiveType(Enum):
@@ -18,7 +18,7 @@ class Room:
 
     def __init__(self):
         self._websockets: List[WebSocket] = []
-        self._on_receive: Dict[self.RECEIVE_TYPES, Callable[[Room, WebSocket], None]]
+        self._on_receive: Dict[self.RECEIVE_TYPES, Callable[[Room, WebSocket], None]] = {}
 
     async def connect(self, websocket: WebSocket) -> NoReturn:
         await websocket.accept()
@@ -75,7 +75,7 @@ class Room:
                     func = self._on_receive[ReceiveType.JSON.value]
 
             if func and text:
-                func_res = func(text)
+                func_res = func(self, websocket, text)
                 if inspect.isawaitable(func_res):
                     await func_res
 
@@ -83,12 +83,16 @@ class Room:
             await self.remove(websocket)
 
     def on_receive(self, mode: Room.RECEIVE_TYPES = ReceiveType.TEXT.value) -> callable:
-        if mode not in self.RECEIVE_TYPES:
+        if not mode in ["text", "bytes", "json"]:
             raise RuntimeError('The "mode" argument should be "text", "bytes" or "json".')
         def inner(func: Callable[[Room, WebSocket, Any], None]):
-            self._on_receive[mode] = func()
+            self._on_receive[mode] = func
 
         return inner
+
+    # def on_receive(self, func: Callable[[Room, WebSocket, Any]]):
+    #     self._on_receive["text"] = func
+    #     print(self._on_receive)
 
     def __call__(self) -> Room:
         return self
