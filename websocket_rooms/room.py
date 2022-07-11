@@ -7,6 +7,7 @@ import json
 import logging
 from typing import Any, Callable, Dict, List, Union, NoReturn, get_args
 from starlette.websockets import WebSocketState, Message, WebSocket, WebSocketDisconnect
+import websockets
 
 
 class ReceiveType(Enum):
@@ -106,9 +107,15 @@ class Room:
         try:
             await websocket.close()
         except RuntimeError('Cannot call "send" once a close message has been sent.'):
-            pass
+            logging.warning(f"websocket {websocket.client.host}:{websocket.client.port} is already closed")
         finally:
             self._websockets.remove(websocket)
+
+
+    async def close(self):
+        websockets = self._websockets.copy()
+        for websocket in websockets:
+            await self.remove(websocket)
 
     def on_receive(self, mode: Room.RECEIVE_TYPES = ReceiveType.TEXT.value) -> callable:
         if not mode in ["text", "bytes", "json"]:

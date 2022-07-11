@@ -219,3 +219,29 @@ async def test_disconnect(
 
     assert test_room._websockets == []
 
+
+@pytest.mark.asyncio
+async def test_close_room(
+    test_client: TestClient,
+    test_room: Room,
+):
+    CONNECTION_NUMBER = 10
+
+    connections = []
+
+    for _ in range(CONNECTION_NUMBER):
+        websocket = test_client.websocket_connect("/ws_test")
+        await websocket.connect()
+        connections.append(websocket)
+
+    assert len(test_room._websockets) == 10
+
+    await test_room.close()
+
+    assert test_room._websockets == []
+
+    for connection in connections:
+        await connection.close()
+
+    
+
