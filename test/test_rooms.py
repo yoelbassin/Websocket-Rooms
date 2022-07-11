@@ -200,3 +200,22 @@ async def test_multiple_broadcast(
             await ws.send_text(message)
 
     await asyncio.gather(*[receiver() for _ in range(RECEIVERS_NUMBER)], sender())
+
+
+@pytest.mark.asyncio
+async def test_disconnect(
+    test_client: TestClient,
+    test_room: Room,
+):
+    CONNECTION_NUMBER = 10
+
+    async def websocket_connect():
+        async with test_client.websocket_connect("/ws_test"):
+            assert not test_room._websockets == []
+
+    await asyncio.gather(*[
+        websocket_connect() for _ in range(CONNECTION_NUMBER)
+    ])
+
+    assert test_room._websockets == []
+

@@ -99,6 +99,16 @@ class Room:
 
         except WebSocketDisconnect:
             await self.remove(websocket)
+            raise ValueError()
+
+
+    async def remove(self, websocket: WebSocket):
+        try:
+            await websocket.close()
+        except RuntimeError('Cannot call "send" once a close message has been sent.'):
+            pass
+        finally:
+            self._websockets.remove(websocket)
 
     def on_receive(self, mode: Room.RECEIVE_TYPES = ReceiveType.TEXT.value) -> callable:
         if not mode in ["text", "bytes", "json"]:
@@ -112,8 +122,7 @@ class Room:
 
         return inner
 
-
-    
+    # TODO: Add on connect and on disconnect
 
     def __call__(self) -> Room:
         return self
