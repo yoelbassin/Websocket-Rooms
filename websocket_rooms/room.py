@@ -5,7 +5,17 @@ from gc import callbacks
 import inspect
 import json
 import logging
-from typing import Any, Callable, Dict, List, Union, NoReturn, get_args
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Union,
+    NoReturn,
+    get_args,
+)
 from starlette.websockets import WebSocketState, Message, WebSocket, WebSocketDisconnect
 import websockets
 
@@ -24,7 +34,10 @@ class Room:
     def __init__(self):
         self._websockets: List[WebSocket] = []
         self._on_receive: Dict[
-            self.RECEIVE_TYPES, Callable[[Room, WebSocket], None]
+            self.RECEIVE_TYPES, Callable[[Room, WebSocket, Any], None]
+        ] = {}
+        self._on_disconnect: Dict[
+            Literal["before", "after"], Callable[[Room, WebSocket], None]
         ] = {}
 
     async def connect(self, websocket: WebSocket) -> NoReturn:
@@ -102,15 +115,21 @@ class Room:
             await self.remove(websocket)
             raise ValueError()
 
-
     async def remove(self, websocket: WebSocket):
+        before = self._on_disconnect.get("before")
+        if before is not None:
+            await await_if_awaitable(before(self, websocket))
         try:
             await websocket.close()
         except RuntimeError('Cannot call "send" once a close message has been sent.'):
-            logging.warning(f"websocket {websocket.client.host}:{websocket.client.port} is already closed")
+            logging.warning(
+                f"websocket {websocket.client.host}:{websocket.client.port} is already closed"
+            )
         finally:
             self._websockets.remove(websocket)
-
+        after = self._on_disconnect.get("after")
+        if after is not None:
+            await await_if_awaitable(after(self, websocket))
 
     async def close(self):
         websockets = self._websockets.copy()
@@ -130,6 +149,20 @@ class Room:
         return inner
 
     # TODO: Add on connect and on disconnect
+    def on_disconnect(self, mode: Literal["before", "after"]):
+        if mode not in ["before", "after"]:
+            raise RuntimeError('The "mode" argument should be "before" or "after".')
+
+        def inner(self, func: Callable[[Room, WebSocket], None]):
+            self._on_disconnect[mode] = func
+            return func
+
+        return inner
 
     def __call__(self) -> Room:
         return self
+
+
+async def await_if_awaitable(func_res: Any):
+    if inspect.isawaitable(func_res):
+        await func_res
