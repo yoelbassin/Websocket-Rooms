@@ -18,12 +18,24 @@ setuptools.setup(
     author_email="bassin.yoel@gmail.com",
     license="MIT",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha" "Intended Audience :: Developers",
+        "Development Status :: 2 - Pre-Alpha",
+        "Intended Audience :: Developers",
         "Framework :: AsyncIO, Starlette",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
     ],
     packages=["websocket_rooms"],
     install_requires=["starlette"],
-    extras_require={"test": ["fastapi", "pytest", "pytest-asyncio", "async-asgi-testclient", "flake8"], "example": ["fastapi", "uvicorn", "websockets"]},
+    extras_require={
+        "test": [
+            "fastapi",
+            "pytest",
+            "pytest-asyncio",
+            "async-asgi-testclient",
+            "flake8",
+            "isort",
+            "black",
+        ],
+        "example": ["fastapi", "uvicorn", "websockets"],
+    },
 )

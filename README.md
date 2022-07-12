@@ -1,5 +1,4 @@
 ![ci workflow](https://github.com/yoelbassin/Websocket-Rooms/actions/workflows/ci.yml/badge.svg)
-
 # Websocket Rooms: `websocket_rooms`
 
 A python library for creating WebSocket rooms, for message sharing or data distribution to multiple connections.
