@@ -173,27 +173,22 @@ class Room:
                         await func_res
 
         except WebSocketDisconnect:
-            await self.remove(websocket)
+            await self.remove(websocket, closed=True)
 
-    async def remove(self, websocket: WebSocket) -> None:
+    async def remove(self, websocket: WebSocket, closed: bool = False) -> None:
         """
         Remove a websocket from the room, and close it.
         """
         before = self._on_disconnect.get("before")
         if before is not None:
             await await_if_awaitable(before(self, websocket))
-        try:
+        if not closed:
             await websocket.close()
-        except RuntimeError('Cannot call "send" once a close message has been sent.'):
-            logging.warning(
-                f"websocket {websocket.client.host}:{websocket.client.port} is already closed"
-            )
-        finally:
-            self._websockets.remove(websocket)
-            # kill the publisher task if there are no listeners
-            if self._websockets == []:
-                self._publisher_task.cancel()
-                self._publisher_task = None
+        self._websockets.remove(websocket)
+        # kill the publisher task if there are no listeners
+        if self._websockets == []:
+            self._publisher_task.cancel()
+            self._publisher_task = None
         after = self._on_disconnect.get("after")
         if after is not None:
             await await_if_awaitable(after(self, websocket))

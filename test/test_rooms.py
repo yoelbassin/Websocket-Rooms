@@ -134,6 +134,7 @@ async def test_multiple_on_receive_simultaniously(
 
     assert set(message_buffer) == set(messages)
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "message", ["hi!", "1234", 1234, "\U0001f5ff", b"123", {"hello": "world"}]
@@ -205,7 +206,9 @@ async def test_multiple_broadcast(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("message", ["hi"])
-async def test_message_queue_empty_if_no_connections(test_client: TestClient, test_room: Room, message: Any):
+async def test_message_queue_empty_if_no_connections(
+    test_client: TestClient, test_room: Room, message: Any
+):
     await test_room.push_text(message + "0")
     async with test_client.websocket_connect("/ws_test") as ws:
         await test_room.push_text(message + "1")
@@ -225,6 +228,22 @@ async def test_disconnect(
             assert not test_room._websockets == []
 
     await asyncio.gather(*[websocket_connect() for _ in range(CONNECTION_NUMBER)])
+
+    assert test_room._websockets == []
+
+
+@pytest.mark.asyncio
+async def test_disconnect_one_after_another(
+    test_client: TestClient,
+    test_room: Room,
+):
+    CONNECTION_NUMBER = 10
+
+    for _ in range(CONNECTION_NUMBER):
+        async with test_client.websocket_connect("/ws_test") as ws:
+            assert not test_room._websockets == []
+            await ws.close()
+            await asyncio.sleep(0)
 
     assert test_room._websockets == []
 
