@@ -134,7 +134,6 @@ async def test_multiple_on_receive_simultaniously(
 
     assert set(message_buffer) == set(messages)
 
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "message", ["hi!", "1234", 1234, "\U0001f5ff", b"123", {"hello": "world"}]
@@ -148,6 +147,8 @@ async def test_broadcast(test_client: TestClient, test_room: Room, message: Any)
         async with test_client.websocket_connect("/ws_test") as ws_2:
             await ws_1.send_text(message)
             recv = await ws_2.receive_text()
+            logging.info(message)
+            logging.info(type(recv))
             assert recv == message
 
 
@@ -200,6 +201,16 @@ async def test_multiple_broadcast(
             await ws.send_text(message)
 
     await asyncio.gather(*[receiver() for _ in range(RECEIVERS_NUMBER)], sender())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("message", ["hi"])
+async def test_message_queue_empty_if_no_connections(test_client: TestClient, test_room: Room, message: Any):
+    await test_room.push_text(message + "0")
+    async with test_client.websocket_connect("/ws_test") as ws:
+        await test_room.push_text(message + "1")
+        recv = await ws.receive_text()
+        assert recv == message + "1"
 
 
 @pytest.mark.asyncio
@@ -281,11 +292,11 @@ async def test_on_connect(
     after_results: List[bool] = []
 
     @test_room.on_connect("before")
-    def on_disconnect_before(test_room: Room, websocket: WebSocket):
+    def on_connect_before(test_room: Room, websocket: WebSocket):
         after_results.append(websocket not in test_room._websockets)
 
     @test_room.on_connect("after")
-    def on_disconnect_after(test_room: Room, websocket: WebSocket):
+    def on_connect_after(test_room: Room, websocket: WebSocket):
         before_results.append(websocket in test_room._websockets)
 
     async def websocket_connect():

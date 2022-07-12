@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 from enum import Enum
-from gc import callbacks
 import inspect
 import json
 import logging
@@ -11,10 +10,9 @@ from typing import (
     Dict,
     List,
     Literal,
-    Optional,
+    Tuple,
     Union,
     NoReturn,
-    get_args,
 )
 from starlette.websockets import WebSocketState, Message, WebSocket, WebSocketDisconnect
 
@@ -29,20 +27,38 @@ class Room:
     RECEIVE_TYPES = Union[
         ReceiveType.TEXT.value, ReceiveType.JSON.value, ReceiveType.BYTES.value
     ]
+    _websockets: List[WebSocket]
+    _on_connect: Dict[Literal["before", "after"], Callable[[Room, WebSocket], None]]
+    _on_receive: Dict[Literal["text", "bytes", "json"], Callable[[Room, WebSocket, Any], None]]
+    _on_disconnect: Dict[Literal["before", "after"], Callable[[Room, WebSocket], None]]
+    _to_push: asyncio.Queue
+    _publisher_task: asyncio.Task
 
     def __init__(self):
-        self._websockets: List[WebSocket] = []
-        self._on_receive: Dict[
-            self.RECEIVE_TYPES, Callable[[Room, WebSocket, Any], None]
-        ] = {}
-        self._on_disconnect: Dict[
-            Literal["before", "after"], Callable[[Room, WebSocket], None]
-        ] = {}
-        self._on_connect: Dict[
-            Literal["before", "after"], Callable[[Room, WebSocket], None]
-        ] = {}
+        self._websockets = []
+        self._on_receive = {}
+        self._on_disconnect = {}
+        self._on_connect = {}
+        self._to_push = asyncio.Queue()
+        self._publisher_task = None
 
     async def connect(self, websocket: WebSocket) -> NoReturn:
+        """
+        Accepts a websocket connection and, adds it to the room clients list, and runs the 
+        _run_client_lifecycle function to manage the connection.
+
+        Parameters
+        ----------
+        websocket : WebSocket
+            The websocket to connect
+
+        Returns
+        -------
+        NoReturn
+            The function runs for the entire client lifetime.
+        """
+        if not self._publisher_task:
+            self._publisher_task = asyncio.create_task(self._publisher())
         before = self._on_connect.get("before")
         if before:
             await await_if_awaitable(before(self, websocket))
@@ -53,39 +69,76 @@ class Room:
             await await_if_awaitable(after(self, websocket))
         await self._run_client_lifecycle(websocket)
 
-    async def push_json(self, message: any) -> None:
+    async def _push(self, message_object: Tuple[Any, Literal["text", "bytes", "json"]]):
         """
-        Pushes the data as a broadcast to all the room clients
+        Pushes the message object into the message queue.
 
         Parameters
         ----------
-        message: any
+        message_object : Tuple[Any, Literal["text", "bytes", "json"]]
+            the message object to be pushed
+        """
+        if self._publisher_task:
+            await self._to_push.put(message_object)
+
+    async def push_json(self, message: dict) -> None:
+        """
+        Pushes the json data as a broadcast to all the room clients
+
+        Parameters
+        ----------
+        message : dict
             the message to be pushed
         """
-        living_connections: List[WebSocket] = []
-        while len(self._websockets) > 0:
-            websocket = self._websockets.pop()
-            await websocket.send_json(message)
-            living_connections.append(websocket)
-        self._websockets = living_connections
+        await self._push((message, "json"))
 
     async def push_text(self, message: str) -> None:
-        living_connections: List[WebSocket] = []
-        while len(self._websockets) > 0:
-            websocket = self._websockets.pop()
-            await websocket.send_text(message)
-            living_connections.append(websocket)
-        self._websockets = living_connections
+        """
+        Pushes the str data as a broadcast to all the room clients
+
+        Parameters
+        ----------
+        message: str
+            the message to be pushed
+        """
+        await self._push((message, "text"))
 
     async def push_bytes(self, message: bytes) -> None:
-        living_connections: List[WebSocket] = []
-        while len(self._websockets) > 0:
-            websocket = self._websockets.pop()
-            await websocket.send_bytes(message)
-            living_connections.append(websocket)
-        self._websockets = living_connections
+        """
+        Pushes the bytes data as a broadcast to all the room clients
+
+        Parameters
+        ----------
+        message: bytes
+            the message to be pushed
+        """
+        await self._push((message, "bytes"))
+
+    async def _publisher(self):
+        """
+        A publisher that runs on the message queue and pushes the message to all the clients.
+        This courtine is ran in the background in the _publisher_task task.
+        """
+        while True:
+            (message, message_type) = await self._to_push.get()
+            living_connections: List[WebSocket] = []
+            while len(self._websockets) > 0:
+                websocket = self._websockets.pop()
+                try:
+                    await websocket.__getattribute__(f"send_{message_type}")(message)
+                except WebSocketDisconnect:
+                    continue
+                living_connections.append(websocket)
+            self._websockets = living_connections
 
     async def _run_client_lifecycle(self, websocket: WebSocket) -> NoReturn:
+        """
+        Manages the clients lifecycle, calling on_receive callback when a message is received from the websocket.
+
+        Raises
+        ------
+        RuntimeError('WebSocket is not connected. Need to call "accept" first.')
+        """
         try:
             while True:
                 if websocket.application_state != WebSocketState.CONNECTED:
@@ -121,9 +174,11 @@ class Room:
 
         except WebSocketDisconnect:
             await self.remove(websocket)
-            raise ValueError()
 
-    async def remove(self, websocket: WebSocket):
+    async def remove(self, websocket: WebSocket) -> None:
+        """
+        Remove a websocket from the room, and close it.
+        """
         before = self._on_disconnect.get("before")
         if before is not None:
             await await_if_awaitable(before(self, websocket))
@@ -135,16 +190,43 @@ class Room:
             )
         finally:
             self._websockets.remove(websocket)
+            # kill the publisher task if there are no listeners
+            if self._websockets == []:
+                self._publisher_task.cancel()
+                self._publisher_task = None
         after = self._on_disconnect.get("after")
         if after is not None:
             await await_if_awaitable(after(self, websocket))
 
-    async def close(self):
+    async def close(self) -> None:
+        """
+        Close the room and all its connections.
+        """
         websockets = self._websockets.copy()
         for websocket in websockets:
             await self.remove(websocket)
 
-    def on_receive(self, mode: Room.RECEIVE_TYPES = ReceiveType.TEXT.value) -> callable:
+    def on_receive(
+        self, mode: Room.RECEIVE_TYPES = ReceiveType.TEXT.value
+    ) -> Callable[[Room, WebSocket, Any], None]:
+        """
+        The decorator to specify the callbacks that will be run when a message is received from client websocket.
+
+        Parameters
+        ----------
+        mode : Literal["text", "bytes", "json"]
+            The type of the message that callback will be ran on.
+
+        Raises
+        ------
+        RuntimeError('The "mode" argument should be "text", "bytes" or "json".')
+
+        Returns
+        -------
+        Callable[[Room, WebSocket, Any], None]
+            The function that the decorator receives.
+
+        """
         if not mode in ["text", "bytes", "json"]:
             raise RuntimeError(
                 'The "mode" argument should be "text", "bytes" or "json".'
@@ -156,7 +238,26 @@ class Room:
 
         return inner
 
-    def on_connect(self, mode: Literal["before", "after"]):
+    def on_connect(
+        self, mode: Literal["before", "after"]
+    ) -> Callable[[Room, WebSocket], None]:
+        """
+        The decorator to specify the callbacks that will run on websockets connection.
+
+        Parameters
+        ----------
+        mode : Literal["before", "after"]
+            The execution time of the callback - before / after connecting the websocket.
+
+        Raises
+        ------
+        RuntimeError('The "mode" argument should be "before" or "after".')
+
+        Returns
+        -------
+        Callable[[Room, WebSocket], None]
+            The function that the decorator receives.
+        """
         if mode not in ["before", "after"]:
             raise RuntimeError('The "mode" argument should be "before" or "after".')
 
@@ -166,7 +267,26 @@ class Room:
 
         return inner
 
-    def on_disconnect(self, mode: Literal["before", "after"]):
+    def on_disconnect(
+        self, mode: Literal["before", "after"]
+    ) -> Callable[[Room, WebSocket], None]:
+        """
+        The decorator to specify the callbacks that will run on websockets disconnect.
+
+        Paramaters
+        ----------
+        mode : Literal["before", "after"]
+            The execution time of the callback - before / after disconnecting the websocket.
+
+        Raises
+        ------
+        RuntimeError('The "mode" argument should be "before" or "after".')
+
+        Returns
+        -------
+        Callable[[Room, WebSocket], None]
+            The function that the decorator receives.
+        """
         if mode not in ["before", "after"]:
             raise RuntimeError('The "mode" argument should be "before" or "after".')
 
