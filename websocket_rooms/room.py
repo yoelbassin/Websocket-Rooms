@@ -17,7 +17,6 @@ from typing import (
     get_args,
 )
 from starlette.websockets import WebSocketState, Message, WebSocket, WebSocketDisconnect
-import websockets
 
 
 class ReceiveType(Enum):
@@ -153,7 +152,7 @@ class Room:
         if mode not in ["before", "after"]:
             raise RuntimeError('The "mode" argument should be "before" or "after".')
 
-        def inner(self, func: Callable[[Room, WebSocket], None]):
+        def inner(func: Callable[[Room, WebSocket], None]):
             self._on_disconnect[mode] = func
             return func
 
