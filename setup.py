@@ -20,7 +20,6 @@ setuptools.setup(
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
-        "Framework :: AsyncIO, Starlette",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
     ],
