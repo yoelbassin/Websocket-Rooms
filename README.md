@@ -14,7 +14,7 @@ chat_room = Room()
 
 @chat_room.on_receive("json")
 async def on_receive(room: Room, websocket: WebSocket, message: Any) -> None:
-    await room.push(message)
+    await room.push_json(message)
 
 @chat_room.on_connection
 async def on_chatroom_connection(room: Room, websocket: WebSocket) -> None:
@@ -46,7 +46,7 @@ chat_room = RoomWithClientId()
 
 @chat_room.on_receive("json")
 async def on_chatroom_receive(room: RoomWithClientId, websocket: WebSocket, message: Any) -> None:
-    await room.push(message)
+    await room.push_json(message)
 
 @chat_room.on_connection
 async def on_chatroom_connection(room: RoomWithClientId, websocket: WebSocket, client_id: int) -> None:
