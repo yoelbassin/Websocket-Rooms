@@ -1,11 +1,17 @@
 import setuptools
 import pathlib
+import sys
 
 topdir = pathlib.Path(__file__).parent
 
 
 def readfile(f):
     return (topdir / f).read_text("utf-8").strip()
+
+extra_options = {}
+
+if sys.version_info.major == 3 and sys.version_info.minor >= 7:
+    extra_options["long_description_content_type"] = "text/markdown"
 
 
 setuptools.setup(
@@ -37,4 +43,5 @@ setuptools.setup(
         ],
         "example": ["fastapi", "uvicorn", "websockets"],
     },
+    **extra_options
 )
