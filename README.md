@@ -1,4 +1,7 @@
 ![ci workflow](https://github.com/yoelbassin/Websocket-Rooms/actions/workflows/ci.yml/badge.svg)
+![PyPI](https://img.shields.io/pypi/v/websocket-rooms?label=pypi%20package)
+![GitHub](https://img.shields.io/github/license/yoelbassin/Websocket-Rooms)
+<!-- ![PyPI - Downloads](https://img.shields.io/pypi/dm/PACKAGE) -->
 # Websocket Rooms: `websocket_rooms`
 
 A python library for creating WebSocket rooms, for message sharing or data distribution to multiple connections.
