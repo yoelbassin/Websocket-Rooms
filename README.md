@@ -1,36 +1,30 @@
 A python library for creating WebSocket rooms, for message sharing or data distribution to multiple connections.
 
+This library was created after building a several real-time web apps and implementing the same mechanisem to broadcast real-time messages between clients listening for the same real-time telemetries.
+The library simplifies the solution for this issue, and proposes a simpler way to handle multiple websocket clients that act the same way.
+
 # Proposed API:
 ## Basic use:
 Let's create a chatroom where everyone can post their messages:
 ### Using API #1
 ```python
+from websocket_rooms import Room
+
 chat_room = Room()
 
-@room.on_receive("json")
+@chat_room.on_receive("json")
 async def on_receive(room: Room, websocket: WebSocket, message: Any) -> None:
     await room.push(message)
 
-@room.on_connection
+@chat_room.on_connection
 async def on_chatroom_connection(room: Room, websocket: WebSocket) -> None:
     logging.info("{} joined the chat room".format(websocket.client.host))
 
-@app.websocket("/chat")
+@chat_app.websocket("/chat")
 async def connect_websocket(websocket: WebSocket):
     await chat_room.connect(websocket)
 ```
-### Using API #2
-```python
-chat_room = Room()
-
-@app.websocket("/chat")
-async def connect_websocket(websocket: WebSocket):
-    async with chat_room.connect(websocket):
-        logging.info("{} joined the chat room".format(websocket.client.host))
-        async for message in websocket.iter_text():
-            chat_room.push(message)
-```
-## Advanced usage
+## More advanced usage
 
 Example of a more advanced use case, with modification to the `Room` base class:
 Suppose a class `RoomWithClientId`, where each WebSocket has a `client_id` associated with it, which it receives on connection:
@@ -49,10 +43,7 @@ class RoomWithClientId(Room):
 
 
 chat_room = RoomWithClientId()
-```
-### Using API #1
-Simpler, but much more limited:
-```python
+
 @chat_room.on_receive("json")
 async def on_chatroom_receive(room: RoomWithClientId, websocket: WebSocket, message: Any) -> None:
     await room.push(message)
@@ -64,65 +55,4 @@ async def on_chatroom_connection(room: RoomWithClientId, websocket: WebSocket, c
 @app.websocket("/chat/{client_id}")
 async def connect_websocket(websocket: WebSocket, client_id: int):
     await chat_room.connect(websocket, client_id)
-```
-
-### Using API #2
-A little complicated, exposing the `WebSocket` itself to the user, however, allows more freedom:
-```python
-@app.websocket("/chat/{client_id}")
-async def connect_chat_websocket(websocket: WebSocket, client_id: int):
-    async with chat_room.connect(websocket, client_id):
-        logging.info("{} joined the chat room".format(client_id))
-        async for message in websocket.iter_text():
-            chat_room.push(message)
-```
-
-## Advanced usage #2: multiple endpoints for the same room
-should that even be a concern?
-### Using API #1:
-not possible. A solution to this may be creating an option to create a basic `BaseRoom` that connections (?) can use: 
-```python
-# for websockets that are sending and receiving data
-chat_connection = ConnectionsManager(chat_room)
-
-@chat_connection.on_receive("json")
-async def on_chatroom_receive(room: Room, websocket: WebSocket, message: Any) -> None:
-    await room.push(message)
-
-@chat_connection.on_connection
-async def on_chat_connection(room: Room, websocket: WebSocket) -> None:
-    logging.info("{} joined the chat room".format(websocket.client.host))
-
-@app.websocket("/chat_ws")
-async def connect_chat_websocket(websocket: WebSocket) -> None:
-    await chat_connection.connect(websocket, client_id)
-
-# for websockets that are only receiving data
-listener_connection = ConnectionsManager(chat_room)
-
-@listener_connection.on_connection
-async def on_chat_connection(room: Room, websocket: WebSocket) -> None:
-    logging.info("{} joined as a listener to the the chat room".format(websocket.client.host))
-
-@app.websocket("/listening_ws")
-async def connect_listening_websocket(websocket: WebSocket) -> None:
-    await listener_connection.connect(websocket)
-```
-### Using API #2:
-```python
-# An endpoint for websockets that are sending and receiving data
-@app.websocket("/chat_ws")
-async def connect_chat_websocket(websocket: WebSocket):
-    async with chat_room.connect(websocket):
-        logging.info("{} joined the chat room".format(websocket.client.host))
-        async for message in websocket.iter_text():
-            chat_room.push(message)
-
-
-# An endpoint for websockets that only receive data
-@app.websocket("/listening_ws")
-async def connect_listening_websocket(websocket: WebSocket):
-    await chat_room.connect(websocket)
-    logging.info("{} joined as a listener to the chat room".format(websocket.client.host))
-    await chat_room.listen(websocket) # A subject to change - listen / keep_alive / ...
 ```
