@@ -25,5 +25,5 @@ setuptools.setup(
     ],
     packages=["websocket_rooms"],
     install_requires=["starlette"],
-    extras_require={"test": ["fastapi", "pytest", "pytest-asyncio"], "example": ["fastapi", "uvicorn", "websockets"]},
+    extras_require={"test": ["fastapi", "pytest", "pytest-asyncio", "async-asgi-testclient", "flake8"], "example": ["fastapi", "uvicorn", "websockets"]},
 )
