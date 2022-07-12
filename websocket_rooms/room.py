@@ -239,7 +239,7 @@ class Room:
         return inner
 
     def on_connect(
-        self, mode: Literal["before", "after"]
+        self, mode: Literal["before", "after"] = "after"
     ) -> Callable[[Room, WebSocket], None]:
         """
         The decorator to specify the callbacks that will run on websockets connection.
@@ -268,7 +268,7 @@ class Room:
         return inner
 
     def on_disconnect(
-        self, mode: Literal["before", "after"]
+        self, mode: Literal["before", "after"] = "after"
     ) -> Callable[[Room, WebSocket], None]:
         """
         The decorator to specify the callbacks that will run on websockets disconnect.
