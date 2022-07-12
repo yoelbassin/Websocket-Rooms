@@ -1,12 +1,12 @@
+# Websocket Rooms: `websocket_rooms`
+
 A python library for creating WebSocket rooms, for message sharing or data distribution to multiple connections.
 
 This library was created after building a several real-time web apps and implementing the same mechanisem to broadcast real-time messages between clients listening for the same real-time telemetries.
 The library simplifies the solution for this issue, and proposes a simpler way to handle multiple websocket clients that act the same way.
 
-# Proposed API:
 ## Basic use:
 Let's create a chatroom where everyone can post their messages:
-### Using API #1
 ```python
 from websocket_rooms import Room
 
