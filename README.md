@@ -1,6 +1,6 @@
 ![ci workflow](https://github.com/yoelbassin/Websocket-Rooms/actions/workflows/ci.yml/badge.svg)
-![PyPI](https://img.shields.io/pypi/v/websocket-rooms?label=pypi%20package)
-![GitHub](https://img.shields.io/github/license/yoelbassin/Websocket-Rooms)
+[![PyPI Version](https://img.shields.io/pypi/v/websocket-rooms?label=pypi%20package)](https://pypi.python.org/pypi/git-repo)
+[![GitHub](https://img.shields.io/github/license/yoelbassin/Websocket-Rooms)](https://github.com/yoelbassin/Websocket-Rooms/blob/dev/LICENSE)
 <!-- ![PyPI - Downloads](https://img.shields.io/pypi/dm/PACKAGE) -->
 # Websocket Rooms: `websocket_rooms`
 
