@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/yoelbassin/Websocket-Rooms/workflows/ci/badge.svg)](https://github.com/yoelbassin/Websocket-Rooms/actions)
+![ci workflow](https://github.com/yoelbassin/Websocket-Rooms/actions/workflows/ci.yml/badge.svg)
 
 # Websocket Rooms: `websocket_rooms`
 
