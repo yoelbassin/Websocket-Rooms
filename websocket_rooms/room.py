@@ -38,10 +38,19 @@ class Room:
         self._on_disconnect: Dict[
             Literal["before", "after"], Callable[[Room, WebSocket], None]
         ] = {}
+        self._on_connect: Dict[
+            Literal["before", "after"], Callable[[Room, WebSocket], None]
+        ] = {}
 
     async def connect(self, websocket: WebSocket) -> NoReturn:
+        before = self._on_connect.get("before")
+        if before:
+            await await_if_awaitable(before(self, websocket))
         await websocket.accept()
         self._websockets.append(websocket)
+        after = self._on_connect.get("after")
+        if after:
+            await await_if_awaitable(after(self, websocket))
         await self._run_client_lifecycle(websocket)
 
     async def push_json(self, message: any) -> None:
@@ -147,7 +156,16 @@ class Room:
 
         return inner
 
-    # TODO: Add on connect and on disconnect
+    def on_connect(self, mode: Literal["before", "after"]):
+        if mode not in ["before", "after"]:
+            raise RuntimeError('The "mode" argument should be "before" or "after".')
+
+        def inner(func: Callable[[Room, WebSocket], None]):
+            self._on_connect[mode] = func
+            return func
+
+        return inner
+
     def on_disconnect(self, mode: Literal["before", "after"]):
         if mode not in ["before", "after"]:
             raise RuntimeError('The "mode" argument should be "before" or "after".')

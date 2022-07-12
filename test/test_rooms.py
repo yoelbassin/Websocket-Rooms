@@ -243,7 +243,7 @@ async def test_close_room(
 
 
 @pytest.mark.asyncio
-async def test_on_disconnect_before(
+async def test_on_disconnect(
     test_client: TestClient,
     test_room: Room,
 ):
@@ -259,6 +259,34 @@ async def test_on_disconnect_before(
     @test_room.on_disconnect("after")
     def on_disconnect_after(test_room: Room, websocket: WebSocket):
         after_results.append(websocket not in test_room._websockets)
+
+    async def websocket_connect():
+        async with test_client.websocket_connect("/ws_test"):
+            pass
+
+    await asyncio.gather(*[websocket_connect() for _ in range(CONNECTION_NUMBER)])
+
+    assert before_results == [True] * CONNECTION_NUMBER
+    assert after_results == [True] * CONNECTION_NUMBER
+
+
+@pytest.mark.asyncio
+async def test_on_connect(
+    test_client: TestClient,
+    test_room: Room,
+):
+    CONNECTION_NUMBER = 10
+
+    before_results: List[bool] = []
+    after_results: List[bool] = []
+
+    @test_room.on_connect("before")
+    def on_disconnect_before(test_room: Room, websocket: WebSocket):
+        after_results.append(websocket not in test_room._websockets)
+
+    @test_room.on_connect("after")
+    def on_disconnect_after(test_room: Room, websocket: WebSocket):
+        before_results.append(websocket in test_room._websockets)
 
     async def websocket_connect():
         async with test_client.websocket_connect("/ws_test"):
